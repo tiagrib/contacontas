@@ -21,7 +21,7 @@ class ConCoWin:
                    borders_outerH=True, borders_innerV=True, borders_innerH=True, borders_outerV=True):
             dpg.add_table_column(label="Bank")
             dpg.add_table_column(label="Account")
-            dpg.add_table_column(label="Sum")
+            dpg.add_table_column(label="CumSum")
             dpg.add_table_column(label="Year")
             dpg.add_table_column(label="Month")
             dpg.add_table_column(label="Day")
@@ -40,11 +40,13 @@ class ConCoWin:
         with dpg.window(tag="ContaContas", label="Conta-Contas"):
 
             with dpg.tab_bar(tag="tabSpaces"):
-                with dpg.tab(label='Mensal') as tab:
+                with dpg.tab(label='Mensal', tag='Mensal') as tab:
                     self.create_tab_mensal(tab)
                 
-                with dpg.tab(label='Movimentos') as tab:
+                with dpg.tab(label='Movimentos', tag='Movimentos') as tab:
                     self.create_tab_movimentos(tab, contacontas)
+
+        dpg.set_value("tabSpaces", "Movimentos")
 
         with dpg.item_handler_registry(tag="window_handler"):
             dpg.add_item_resize_handler(callback=self.window_resized)
@@ -60,13 +62,20 @@ class ConCoWin:
     def present(self, contacontas):
         for m in contacontas.data.m.itertuples():
             with dpg.table_row():
-                dpg.add_text(m.bank)
-                dpg.add_text(m.account)
-                dpg.add_text(m.sum)
+                tag_col = (255, 255, 255, 255)
+                if m.classification == 'PayPal':
+                    tag_col = (100, 150, 255, 255)
+                if m.value < 0:
+                    val_col = (255,100,100, 255)
+                else:
+                    val_col = (100,255,100, 255)
+                dpg.add_text(m.bank, color=tag_col)
+                dpg.add_text(m.account, color=tag_col)
+                dpg.add_text(m.cumsum, color=tag_col)
                 dpg.add_text(m.date.year)
                 dpg.add_text(m.date.month)
                 dpg.add_text(m.date.day)
-                dpg.add_text(m.value)
+                dpg.add_text(m.value, color=val_col)
                 dpg.add_text(m.desc)
                 dpg.add_text(m.classification)
                 

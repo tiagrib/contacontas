@@ -32,7 +32,6 @@ class ActivoBank(Bank):
 
 	def __init__(self):
 		super().__init__("ActivoBank")
-		self._contas = {}
 
 	@staticmethod
 	def is_source(lines):

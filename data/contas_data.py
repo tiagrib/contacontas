@@ -2,6 +2,7 @@ from decimal import Decimal
 import numpy as np
 import pandas as pd
 import numpy.lib.recfunctions as nrec
+from . import cls
 
 
 def _resize_table(t, n):
@@ -48,19 +49,19 @@ class ContasData:
         self.num_b = 0
         self.num_a = 0
         self.num_m = 0
-
         # movements
         # load into a numpy array because it seems to be faster, later convert to pandas
         self._np_m = np.array([], dtype=np.dtype([
                 ('fk_mov', np.int32), 
                 ('bank', 'U32'), 
                 ('account', 'U32'), 
+                ('accb_key', 'U64'), 
                 ('date', 'datetime64[s]'), 
                 ('value', np.float32), 
                 ('desc', 'U128'),
                 ('fk_acc', np.int32),
                 ('classification', 'U32'),
-                ('sum', np.float32),
+                ('cumsum', np.float32),
                 ('mask', np.bool_),
         ]))
 
@@ -104,15 +105,15 @@ class ContasData:
             a_key = a_key.fk_acc.array[0]
 
         m_key = self.num_m
-        fields = (m_key, bank, account, np.datetime64(date), float(value), desc.lower(), a_key, "",0.0, True)
+        fields = (m_key, bank, account, bank + "." + account, np.datetime64(date), float(value), desc.lower(), a_key, "",0.0, True)
         if self.precheck_record(fields):
             self.num_m += 1
             self._np_m[m_key] = fields
 
     def precheck_record(self, rec):
         if rec[1] == "PayPal":
-            if  "bank deposit to pp" in rec[5] or "general credit card deposit" in rec[5]:
-                return False
+            if  "bank deposit to pp" in rec[6] or "general credit card deposit" in rec[6] or "top up" in rec[6]:
+                return True
         return True
 
     def classify_record(self, rec):
@@ -126,13 +127,14 @@ class ContasData:
         self._np_m = _resize_table(self._np_m, self.num_m)
         # convert to pd
         self.m = pd.DataFrame(self._np_m)
+        self.mcoli = dict([(c, self.m.columns.get_loc(c)) for c in self.m.columns if c in self.m])
 
         # sort by date
         self.m['date'] = pd.to_datetime(self.m['date'])
-        self.m.sort_values(by='date')
+        self.m.sort_values(by='date', inplace = True)
+        self.m.reset_index(drop=True)
 
-        # classify records
-        self.m = self.m.apply(lambda rec : self.classify_record(rec), axis=1)
+        self.classify()
 
         mask = np.full(self.m.size,True)
         # remove paypal 
@@ -146,15 +148,32 @@ class ContasData:
 #            np.flatnonzero(np.core.defchararray.find(view['desc'],"5637722933")!=-1)
 
         # compute cumulative sums per account
-        account_sum = {}
+        account_cumsum = {}
         for r in pd.merge(self.b, self.a, on='fk_bank', suffixes=("_b", "_a")).itertuples(): 
-            account_sum[r.name_b + '.' + r.name_a] = 0.0
+            account_cumsum[r.name_b + '.' + r.name_a] = 0.0
         
         for i in range(self.num_m):
             entry = self.m.iloc[i]
-            acc_key = entry.bank + "." + entry.account
-            account_sum[acc_key] += entry.value
-            self.m.at[i, 'sum'] = account_sum[acc_key]
+            account_cumsum[entry.accb_key] += entry.value
+            self.m.iat[i, self.mcoli['cumsum']] = account_cumsum[entry.accb_key]
             
 
         return self.m
+    
+    def classify(self):
+        # classify records
+        stack = cls.classifier_stack()
+        stack.add_classifier(cls.test_classifier(class_field = self.mcoli['classification'], 
+            classes = {
+                cls.t_contains_words("desc", 
+                             [
+                                "bank deposit to pp", 
+                                "general credit card deposit", 
+                                "top up" 
+                                ]): "pp_mov",
+                cls.t_and(
+                    cls.t_contains_words("desc", "paypal"),
+                    cls.t_not(cls.t_eq("bank", "PayPal"))
+                ): "PayPal",
+        }))
+        self.m = stack.run(self.m)
