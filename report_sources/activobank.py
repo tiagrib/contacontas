@@ -3,10 +3,11 @@
 # This software is released under the MIT License.
 # https://opensource.org/licenses/MIT
 
-from datetime import datetime
+
 from enum import Enum
-from decimal import *
 from data.bank import Bank, Account, Segment, Movement
+from .util import isFloat, isInt, extract_datetime_Ymd, extract_datetime_mov, extract_decimals
+from decimal import *
 import re
 
 DEBUG = False
@@ -24,35 +25,29 @@ kEXTRACTO_DATAS = "EXTRATO DE"
 kCC_START = "OPERACAO DEBITO CREDITO"
 kCC_END	 = "SALDO EM DIVIDA A DATA DO EXTRATO ATUAL"
 
-def is_activo_bank(lines):
-		# first parser was written on this date, so we know it works from here
-		if any('ACTVPTPL' in s for s in lines[5:15])  and \
-			is_extracto_combinado(lines):
-				return True
-		return False
-
 def is_extracto_combinado(lines):
 	return 'EXTRATO COMBINADO' in lines[4:15]
-
-def isInt(value):
-	try:
-		x = int(value)
-		return True
-	except ValueError:
-		return False
-
-def isFloat(value):
-	try:
-		x = float(value)
-		return True
-	except ValueError:
-		return False
 
 class ActivoBank(Bank):
 
 	def __init__(self):
 		super().__init__("ActivoBank")
 		self._contas = {}
+
+	@staticmethod
+	def is_source(lines):
+		# first parser was written on this date, so we know it works from here
+		if any('ACTVPTPL' in s for s in lines[5:15])  and \
+			is_extracto_combinado(lines):
+				return True
+		return False
+
+	def parse_source(self, all_lines):
+		print("Parsing ActivoBank report... ", len(all_lines), "lines.")
+		if is_extracto_combinado(all_lines):
+			self.activo_bank_parse_extracto_combinado(all_lines)
+		else:
+			print("Unknown document type from ActivoBank.")
 
 	class DocType(Enum):
 		ExtractoCombinado = 1
@@ -93,20 +88,7 @@ class ActivoBank(Bank):
 
 		def extract_segments(self):
 
-			def extract_datetime(text, split_idx = -1):
-				if split_idx!=-1:
-					text = text.split(" ")[split_idx]
-				return datetime.strptime(text, "%Y/%m/%d").date()
-
-			def extract_datetime_mov(text):
-				return datetime.strptime(text, "%m.%d").date()
-
-			def extract_decimals(text):
-				p = '[\d]+[.,\d]+|[\d]+[. \d]+|[\d]*[.][\d]+|[\d]+'
-				res = list(re.finditer(p, text))
-				if len(res)>1:
-					return [Decimal(f[0].replace(' ','').replace(',','')) for f in res]
-				return Decimal(res[0][0].replace(' ','').replace(',',''))
+			
 
 			def extract_a_ordem(self):
 				self.start_value = extract_decimals(self._l(kSALDO_INICIAL))
@@ -171,8 +153,8 @@ class ActivoBank(Bank):
 						if DEBUG: print("\t", movements[-1])
 					self.segments["CC"].append((movements))
 
-			self.start_date = extract_datetime(self._l(kEXTRACTO_DATAS), 2)
-			self.end_date = extract_datetime(self._l(kEXTRACTO_DATAS), 4)
+			self.start_date = extract_datetime_Ymd(self._l(kEXTRACTO_DATAS), 2)
+			self.end_date = extract_datetime_Ymd(self._l(kEXTRACTO_DATAS), 4)
 			if DEBUG:
 				print("Start Date", self.start_date)
 				print("Start Date", self.end_date)
@@ -183,13 +165,6 @@ class ActivoBank(Bank):
 	def update_state(self, line):
 		if line.lower() == "CONTA SIMPLES".lower():
 			pass
-
-	def activo_bank_parse_report(self, all_lines):
-		print("Parsing ActivoBank report... ", len(all_lines), "lines.")
-		if is_extracto_combinado(all_lines):
-			self.activo_bank_parse_extracto_combinado(all_lines)
-		else:
-			print("Unknown document type from ActivoBank.")
 		
 	def _create_index_extracto_combinado(self, all_lines):
 		index = {}

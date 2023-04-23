@@ -26,6 +26,13 @@ class Bank:
         self.name = name
         self.accounts = {}
 
+    @staticmethod
+    def is_source(src):
+        raise NotImplementedError()
+
+    def parse_source(self, src):
+        raise NotImplementedError()
+
     def append_account_segment(self, account, movements):
         if account not in self.accounts:
             self.accounts[account] = Account(account, self)
