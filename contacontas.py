@@ -10,13 +10,17 @@ from data.contas_data import ContasData
 from data.config import Config
 import csv
 from time import perf_counter
+import argparse
 
 class ContaContas:
     def __init__(self):
         self.sources = []
         self.banks = {}
         self.data = ContasData()
-        self.config = Config()
+        parser = argparse.ArgumentParser()
+        parser.add_argument("-r", "--rebuild", help="Rebuild the cache on load.", action="store_true")
+        self.ccargs = parser.parse_args()
+        self.config = Config(self.ccargs)
 
 
     def loadPDF(self, source):
@@ -80,7 +84,7 @@ class ContaContas:
         
     def digest(self):
         t1_start = perf_counter()
-        if not self.config.cocodb_cache or self.config.any_uncached_data_loaded:
+        if not self.config.cocodb_cache or self.config.any_uncached_data_loaded or self.config.rebuild_cache:
             print("Rebuild DB...")
             self.data.prepare(*self._count_prealloc())
             print("Load DB...")
@@ -88,14 +92,14 @@ class ContaContas:
                 for account in bank.accounts.values():
                     for segment in account.segments:
                         for mov in segment.movements:
-                            self.data.record(bank.name, account.name, mov.date, mov.value, mov.desc)
+                            self.data.pre_record(bank.name, account.name, mov.date, mov.value, mov.desc)
             print("Finalize DB...")
             self.data.finalize()
             self.config.save_cocodb(self.data)
         else:
             print("Load DB from cache...")
             self.data = self.config.load_cocodb()
-            self.data.classify()
+            self.data.postprocess()
 
         t1_stop = perf_counter()
         print("DB Digestion took:", t1_stop-t1_start)

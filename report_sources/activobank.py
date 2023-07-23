@@ -148,6 +148,8 @@ class ActivoBank(Bank):
 							desc = splits[2:-1]
 						value = float(value)
 						desc = ' '.join(desc)
+						if not "pagamento cartao de credito" in desc:
+							value = -value
 						movements.append(Movement(date, desc, value))
 						if DEBUG: print("\t", movements[-1])
 					self.segments["CC"].append((movements))

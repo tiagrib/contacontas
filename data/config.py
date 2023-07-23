@@ -6,10 +6,11 @@ import pickle
 import traceback
 
 class Config:
-    def __init__(self):
+    def __init__(self, ccargs):
         self._config_filename = "config.json"
         self._cocodb_filename = "cocodb.pkl"
         self.caches = {}
+        self.rebuild_cache = ccargs.rebuild
         self.config = {
             'caches': self.caches
         }
@@ -88,6 +89,8 @@ class Config:
                 traceback.print_exc(file=sys.stdout)
 
     def get_source_cache(self, path):
+        if self.rebuild_cache:
+            return None
         path_hash = hashlib.md5(path.encode()).hexdigest()
         cache_filename = self.cache_path(path_hash)
         if path_hash in self.caches and os.path.exists(cache_filename):

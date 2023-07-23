@@ -1,3 +1,5 @@
+from .manipulation import append_tag, TAGS_FIELD
+
 class classifier_stack:
     def __init__(self):
         self.stack = []
@@ -31,6 +33,22 @@ class t_eq():
     def test(self, rec):
         return rec[self.field] == self.test_value
     
+class t_lessthan():
+    def __init__(self, field, test_value):
+        self.field = field
+        self.test_value = test_value
+
+    def test(self, rec):
+        return rec[self.field] < self.test_value
+    
+class t_greaterthan():
+    def __init__(self, field, test_value):
+        self.field = field
+        self.test_value = test_value
+
+    def test(self, rec):
+        return rec[self.field] > self.test_value
+    
 class t_not():
     def __init__(self, orig_test):
         self.orig_test = orig_test
@@ -55,9 +73,8 @@ class t_or():
         return self.test1.test(rec) or self.test2.test(rec)
 
 class test_classifier:
-    def __init__(self, classes = {}, class_field = "classification"):
+    def __init__(self, classes = {}):
         self.test_classes = classes
-        self.class_field = class_field
 
     def add_class(self, test, tag):
         self.test_classes[test] = tag
@@ -74,5 +91,5 @@ class test_classifier:
     def exec(self, rec):
         tag = self.test(rec)
         if tag:
-            rec[self.class_field] = tag
+            rec[TAGS_FIELD] = append_tag(rec, tag)
         return rec
