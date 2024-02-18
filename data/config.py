@@ -11,6 +11,7 @@ class Config:
         self._cocodb_filename = "cocodb.pkl"
         self.caches = {}
         self.rebuild_cache = ccargs.rebuild
+        self.reload_data = ccargs.rebuild
         self.config = {
             'caches': self.caches
         }

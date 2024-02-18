@@ -1,4 +1,4 @@
-from .manipulation import append_tag, TAGS_FIELD
+from .manipulation import append_tag, TAGS_FIELD, INTERNAL_FIELD
 
 class classifier_stack:
     def __init__(self):
@@ -80,7 +80,10 @@ class test_classifier:
         self.test_classes[test] = tag
 
     def run(self, data):
-        return data.apply(lambda rec : self.exec(rec), axis=1, result_type='broadcast')
+        data = data.apply(lambda x: self.exec(x), axis=1)
+        #for i in range(len(data)):
+        #    data.iloc[i] = self.exec(data.iloc[i])
+        return data
 
     def test(self, rec):
         for class_test, tag in self.test_classes.items():
@@ -90,6 +93,7 @@ class test_classifier:
 
     def exec(self, rec):
         tag = self.test(rec)
-        if tag:
-            rec[TAGS_FIELD] = append_tag(rec, tag)
+        rec.loc[TAGS_FIELD] = append_tag(rec, tag)
+        if tag is not None:
+            rec.loc[INTERNAL_FIELD] = True
         return rec
