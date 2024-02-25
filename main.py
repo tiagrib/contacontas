@@ -18,7 +18,6 @@ if __name__ == "__main__":
 	cc.loadPDF(EXTRACT_CONTA_21)
 	cc.loadCSV(EXTRACTO_PayPal_21)
 	cc.finalize_loading()
-	cc.update()
 	cc.save()
 	asyncio.run(cc.launchGUI(ConCoWin))
 	cc.save()
