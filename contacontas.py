@@ -171,6 +171,7 @@ class ContaContas:
 		self.make_records_from_tagged('poup_in', "ActivoBank.Poupança", invert_value=True)
 		self.make_records_from_tagged('poup_out', "ActivoBank.Poupança", invert_value=True)
 		self.data.postprocess()
+		self.update()
 
 
 	def make_records_from_tagged(self, tag, bank_account, invert_value=False):

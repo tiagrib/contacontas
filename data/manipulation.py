@@ -89,7 +89,7 @@ def set_internal_mask(data, internal_mask_value=True, mask=True, accumulate=Fals
     elif internal_mask_value == 2: # internal only
         set_mask(data, data['internal'] == True, mask=mask, accumulate=accumulate)
     else: # all
-        data.mask = mask
+        data.loc[data.index,'mask'] = mask
         
 
 def set_tag_mask(data, tag, mask=True, accumulate=False):

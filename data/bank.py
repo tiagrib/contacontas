@@ -17,6 +17,7 @@ class Account():
 		self.bank = bank
 		self.name = account_name
 		self.segments = []
+		self.initial_value = 0
 
 	def append_segment(self, movements):
 		self.segments.append(Segment(self, movements))
