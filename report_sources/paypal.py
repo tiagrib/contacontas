@@ -13,6 +13,7 @@ class PayPal(Bank):
 		return isinstance(src, list) and len(src)>0 and len(src[0])==18
 		
 	def parse_source(self, src):
+		print("Parsing PayPal report... ", len(src), "lines.")
 		movs = []
 		for line in src[1:]:
 			s_date = extract_datetime_mdY(line[0])

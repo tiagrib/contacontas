@@ -12,13 +12,11 @@ EXTRACTO_PayPal_22 = f"..\IRS2022\PayPal 2022.CSV"
 
 if __name__ == "__main__":
 	cc = ContaContas()
-	ab = ActivoBank()
-	ab.add_account('Poupanças')
-	cc.digest_source(ab)
-	cc.loadPDF(EXTRACT_CONTA_21)
-	cc.loadCSV(EXTRACTO_PayPal_21)
-	cc.finalize_loading()
-	cc.save()
+	#ab = ActivoBank()
+	#ab.add_account('Poupanças')
+	#cc.digest_source(ab)
+	#cc.loadPDF(EXTRACT_CONTA_21)
+	#cc.loadCSV(EXTRACTO_PayPal_21)
 	asyncio.run(cc.launchGUI(ConCoWin))
 	cc.save()
 	sys.exit(0)

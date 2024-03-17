@@ -15,10 +15,13 @@ class TabMovements():
 				dpg.add_button(label="Show Non-internal Only", callback=self.set_non_internal_filter)
 				dpg.add_button(label="Show Internal Only", callback=self.set_internal_only_filter)
 				dpg.add_button(label="Show All", callback=self.set_internal_all_filter)
+				dpg.add_text(f"Filter by account:")
+				dpg.add_listbox(tag='lstAccounts', items=['<ANY>', *self.cc.get_bank_accounts()], num_items=20, callback=self.update_movs, parent='grpSelectionPanel')
+				dpg.add_text(f"Filter by tag:")
 				dpg.add_listbox(tag='lstTags', items=self.cc.data.all_tags, num_items=20, callback=self.update_movs, parent='grpSelectionPanel')
 			
 			with dpg.group(horizontal=False):
-				dpg.add_slider_int(tag='sldMovsDate', label="Filter by Date", max_value=len(self.cc.months), callback=self.update_movs)
+				dpg.add_slider_int(tag='sldMovsDate', label="Filter by Date", max_value=len(self.cc.months)-1, callback=self.update_movs)
 				dpg.add_group(tag='grpMovsTable', width=self.win.PERW(90))
 			self.create_movs_table()
 
@@ -50,9 +53,14 @@ class TabMovements():
 		self.update_movs(sender)
 
 	def update_movs(self, Sender):
+		account = dpg.get_value('lstAccounts')
 		tag = dpg.get_value('lstTags')
 		date = self.cc.months[dpg.get_value('sldMovsDate')]
 		manip.set_internal_mask(self.cc.data.m, self._filter_internal)
+
+		if account != "<ANY>":
+			account = account.split('.')
+			manip.set_bank_account_mask(self.cc.data.m, account[0], account[1], accumulate=True)
 		if tag != "<ANY>":
 			manip.set_tag_mask(self.cc.data.m, tag, accumulate=True)
 		if date != 'ALL':

@@ -13,7 +13,7 @@ import re
 DEBUG = False
 
 kRESUMO_DAS_CONTAS = "RESUMO DAS CONTAS"
-kEOF = "DOCUMENTO DE INFORMAÇÃO SOBRE OS SERVIÇOS MÍNIMOS BANCÁRIOS"
+kEOF = "DE INFORMAÇÃO SOBRE OS SERVIÇOS MÍNIMOS BANCÁRIOS"
 kEOPFrom = "A TRANSPORTAR"
 kEOPTo = "TRANSPORTE"
 #kCONTA_SIMPLES = "CONTA SIMPLES N"
@@ -28,6 +28,9 @@ kCC_END	 = "SALDO EM DIVIDA A DATA DO EXTRATO ATUAL"
 def is_extracto_combinado(lines):
 	return 'EXTRATO COMBINADO' in lines[4:15]
 
+def is_extracto_cc(lines):
+	return any(s.startswith('EXTRATO VISA') for s in lines[5:15])
+
 class ActivoBank(Bank):
 
 	def __init__(self):
@@ -36,15 +39,22 @@ class ActivoBank(Bank):
 	@staticmethod
 	def is_source(lines):
 		# first parser was written on this date, so we know it works from here
-		if any('ACTVPTPL' in s for s in lines[5:15])  and \
-			is_extracto_combinado(lines):
+		if (	'ACTVPTPL' in  lines[5:15] or
+	  			'ActivoBank' in lines[0:3]):
+			if is_extracto_combinado(lines):
 				return True
+			elif is_extracto_cc(lines):
+				return True
+			else:
+				return False
 		return False
 
 	def parse_source(self, all_lines):
 		print("Parsing ActivoBank report... ", len(all_lines), "lines.")
 		if is_extracto_combinado(all_lines):
 			self.activo_bank_parse_extracto_combinado(all_lines)
+		elif is_extracto_cc(all_lines):
+			self.activo_bank_parse_extracto_cc(all_lines)
 		else:
 			print("Unknown document type from ActivoBank.")
 
@@ -75,23 +85,23 @@ class ActivoBank(Bank):
 				remove_num_lines = i_to - i_from + 1
 				new_index = {}
 				for k,v in self._index.items():
+					new_index[k] = v
 					for j in range(len(v)):
 						if v[j] > i_from:
 							v[j] = v[j] - remove_num_lines
 						new_index[k] = v
+				self._index = new_index
 				slice1 = self._lines[:i_from]
 				slice2 = self._lines[i_to+1:]
 				self._lines = slice1 + slice2
-				self._index[kEOPFrom] = []
-				self._index[kEOPTo] = []
+			self._index[kEOPFrom] = []
+			self._index[kEOPTo] = []
 
 		def extract_segments(self):
 
-			
-
 			def extract_a_ordem(self):
-				self.start_value = extract_decimals(self._l(kSALDO_INICIAL))
-				self.end_value = extract_decimals(self._l(kSALDO_FINAL))
+				self.start_value = extract_decimals(self._l(kSALDO_INICIAL), join=True)
+				self.end_value = extract_decimals(self._l(kSALDO_FINAL), join=True)
 				if DEBUG:
 					print("A ORDEM")
 					print("Start Value", self.start_value)
@@ -169,21 +179,28 @@ class ActivoBank(Bank):
 		
 	def _create_index_extracto_combinado(self, all_lines):
 		index = {}
-		keylines = [kRESUMO_DAS_CONTAS, kEOF, kCC_START #, kCONTA_POUPANCA
+		keylines = [kRESUMO_DAS_CONTAS, kCC_START #, kCONTA_POUPANCA
 		]
 
 		keylinestarts = [kEOPFrom, kEOPTo,# kCONTA_SIMPLES, kCONTA_TITULOS,
 		kSALDO_INICIAL, kSALDO_FINAL, kEXTRACTO_DATAS, kCC_END]
 
-		for s in keylines:
-			index[s] = []
-		for s in keylinestarts:
-			index[s] = []
+		keylinecontains = [kEOF]
+
+		for keygroup in [keylines, keylinestarts, keylinecontains]:
+			for k in keygroup:
+				index[k] = []
+		
 		for i in range(len(all_lines)):
 			line = all_lines[i].strip()
-			if line in keylines or any(line.startswith(s) for s in keylinestarts):
-				if line not in keylines:
+			line_in_keylines = line in keylines
+			line_in_keylinestarts = any(line.startswith(s) for s in keylinestarts)
+			line_in_keylinecontains = any(s in line for s in keylinecontains)
+			if line_in_keylines or line_in_keylinestarts or line_in_keylinecontains:
+				if line_in_keylinestarts:
 					key_index = [l for l in keylinestarts if line.startswith(l)][0]
+				elif line_in_keylinecontains:
+					key_index = [s for s in keylinecontains if s in line][0]
 				else:
 					key_index = line
 				index[key_index].append(i)

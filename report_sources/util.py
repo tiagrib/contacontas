@@ -29,9 +29,20 @@ def extract_datetime_mdY(text, split_idx = -1):
 def extract_datetime_mov(text):
     return datetime.strptime(text, "%m.%d").date()
 
-def extract_decimals(text):
+def extract_decimals_from_lines(lines, line_number):
+    res = extract_decimals(lines(line_number))
+    if res is None:
+        res = extract_decimals(lines(line_number, offset=1))
+    return res
+
+def extract_decimals(text, join=False):
     p = '-?[\d]+[.,\d]+|[\d]+[. \d]+|[\d]*[.][\d]+|[\d]+'
     res = list(re.finditer(p, text))
+    if not res:
+          return None
     if len(res)>1:
-        return [Decimal(f[0].replace(' ','').replace(',','')) for f in res]
+        if join:
+              return Decimal(''.join([f[0].replace(' ','').replace(',','') for f in res]))
+        else:
+            return [Decimal(f[0].replace(' ','').replace(',','')) for f in res]
     return Decimal(res[0][0].replace(' ','').replace(',',''))

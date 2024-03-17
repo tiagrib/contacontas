@@ -1,1 +1,13 @@
-{"caches": {"c120fd802a6f33592d5d9d2e9e74f930": 1641641555.0, "c4b07a31fa087511f95af8e4ea05e01c": 1677844721.9935308}}
+{
+    "accounts": {
+        "Poupan\u00e7as": {
+            "bank_type": "ActivoBank",
+            "sources": []
+        }
+    },
+    "unsorted_source_paths": [
+        "../IRS2021/contacontas",
+        "../IRS2022/contacontas",
+        "../IRS2023/contacontas"
+    ]
+}

@@ -16,6 +16,7 @@ import csv
 from time import perf_counter
 import argparse
 from datetime import datetime
+import pandas as pd
 
 STORAGE_FILE = "cc.pkl"
 
@@ -44,6 +45,43 @@ class ContaContas:
 		self.months = []
 		self.config = Config(self.ccargs)
 		self.over = Overviews(self)
+		self.load_sources_from_config()
+
+	def get_bank_accounts(self):
+		res = []
+		for bank in self.banks.values():
+			for account in bank.accounts.values():
+				res.append(bank.name + "." + account.name)
+		return res
+
+	def load_sources_from_config(self):
+		for account_name, info in self.config.setup['accounts'].items():
+			if info is None or info == {} or 'bank_type' not in info:
+				print(f"Failed to initialize account {account_name} from config! Invalid info '" + info + "'.")
+			else:
+				if info['bank_type'].lower() == 'activobank':
+					bank = ActivoBank()
+				elif info['bank_type'].lower() == 'paypal':
+					bank = PayPal()
+				else:
+					bank = None
+					print(f"Failed to initialize account {account_name} from config! Invalid bank '" + info['bank_type'] + "'.")
+				if bank:
+					print(f"Initialize account {account_name} from bank {info['bank_type']}.")
+					bank.add_account(account_name)
+					self.digest_source(bank)
+		
+		for path in self.config.setup['unsorted_source_paths']:
+			pathfiles = Path(path).glob('**/*')
+			for file in pathfiles:
+				if file.suffix.lower() == '.csv':
+					self.loadCSV(file)
+				elif file.suffix.lower() == '.pdf':
+					self.loadPDF(file)
+
+		self.finalize_loading()
+		self.save()
+
 
 	def reload(self):
 		with open(STORAGE_FILE, 'rb') as file:
@@ -70,6 +108,7 @@ class ContaContas:
 			self.digest_source(cache)
 	
 	def loadCSV(self, source):
+		source = str(source)
 		if "paypal" in source.lower():
 			if self.config.rebuild_cache:
 				cache = None
@@ -77,7 +116,7 @@ class ContaContas:
 				cache = self.config.get_source_cache(source)
 			if cache is None:
 				src = []
-				with open(source) as csv_file:
+				with open(source, encoding='utf-8') as csv_file:
 					csv_reader = csv.reader(csv_file, delimiter=';')
 					for row in csv_reader:
 						src.append(row)
@@ -168,8 +207,8 @@ class ContaContas:
 
 	def finalize_loading(self):
 		self.data.finalize_loading()
-		self.make_records_from_tagged('poup_in', "ActivoBank.Poupança", invert_value=True)
-		self.make_records_from_tagged('poup_out', "ActivoBank.Poupança", invert_value=True)
+		self.make_records_from_tagged('poup_in', "ActivoBank.Poupanças", invert_value=True)
+		self.make_records_from_tagged('poup_out', "ActivoBank.Poupanças", invert_value=True)
 		self.data.postprocess()
 		self.update()
 
@@ -205,17 +244,19 @@ class ContaContas:
 		self.data.all_tags = list(set(self.data.all_tags))
 		self.data.all_tags.sort()
 		d = self.data.m.date.min()
-		year = d.year
-		month = d.month
 		today = datetime.now()
-		self.months = ["ALL"]
-		while year != today.year or month != today.month:
-			self.months.append((year, month))
-			if month == 12:
-				month = 1
-				year += 1
-			else:
-				month += 1
+		if not pd.isnull(d):
+			year = d.year
+			month = d.month
+			
+			self.months = ["ALL"]
+			while year != today.year or month != today.month:
+				self.months.append((year, month))
+				if month == 12:
+					month = 1
+					year += 1
+				else:
+					month += 1
 				
 		self.months.append((today.year, today.month))
 

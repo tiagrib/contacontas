@@ -50,6 +50,7 @@ class Overviews:
         for ym in self.months:
             md = self.cc.data.get_monthly(ym[0], ym[1])
             #print("\n", ym, 'ALL', "POS:", md[md.value>=0].value.sum(), "NEG:", md[md.value<0].value.sum(), )
+            print()
             add_monthly(ym, None, md)
 
             for bank in self.cc.banks.values():

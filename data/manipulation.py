@@ -101,6 +101,9 @@ def set_tag_mask(data, tag, mask=True, accumulate=False):
 def set_date_mask(data, year, month, mask=True, accumulate=False):
     set_mask(data, (data['year'] == year) & (data['month'] == month), mask=mask, accumulate=accumulate)
 
+def set_bank_account_mask(data, bank, account, mask=True, accumulate=False):
+    set_mask(data, (data['bank'] == bank) & (data['account'] == account), mask=mask, accumulate=accumulate)
+
 
 def append_tag(rec, tag):
     current_tags = rec.tags

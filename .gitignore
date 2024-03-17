@@ -60,3 +60,5 @@ ENV/
 env.bak/
 venv.bak/
 .cache/
+cache_info.json
+cc.pkl
