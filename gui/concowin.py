@@ -1,16 +1,10 @@
-import dearpygui.dearpygui as dpg
-from .tab_classifier import TabClassifier
-from .tab_movements import TabMovements
-from .tab_summary import TabSummary
-
-
 def window_resize_cb():
-    global ccw
-    ccw.window_resized()
+	global ccw
+	ccw.window_resized()
 
 def viewport_resize_cb():
-    global ccw
-    ccw.window_resized()
+	global ccw
+	ccw.window_resized()
 
 class ConCoWin:
 	def __init__(self):
@@ -23,6 +17,7 @@ class ConCoWin:
 
 
 	def window_resized(self):
+		import dearpygui.dearpygui as dpg
 		self.window_w = dpg.get_viewport_client_width()
 		self.window_h = dpg.get_viewport_client_height()
 		dpg.set_item_width("ContaContas", width=self.PERW(100))
@@ -32,6 +27,7 @@ class ConCoWin:
 		dpg.set_item_width("grpClassificationOptions", width=self.PERW(30))
 		dpg.set_item_width("grpClasses", width=self.PERW(30))
 		dpg.set_item_width('grpClassData', width=self.PERW(70))
+		self.tab_resumos.window_resized()
 
 
 	def PERW(self, percentage):
@@ -47,6 +43,11 @@ class ConCoWin:
 
 
 	async def run(self, contacontas):
+		import dearpygui.dearpygui as dpg
+		from .tab_classifier import TabClassifier
+		from .tab_movements import TabMovements
+		from .tab_summary import TabSummary
+
 		debug = True
 		self.cc = contacontas
 		global ccw
@@ -87,6 +88,34 @@ class ConCoWin:
 			dpg.start_dearpygui()
 		dpg.destroy_context()
 
+from PySide6 import QtCore, QtQml, QtWidgets
+from gui.qtMovementsTab import MovementsBackend
+import sys
+
+
+
+class ConCoWinQt:
+	def __init__(self, contacontas):
+		self.cc = contacontas
+		self.debug = True
+		global ccw
+		ccw = self
+
+		self.movsBackend = MovementsBackend(cc=self.cc)
+
+		QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+		QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
 	
-					
-				
+		self.app = QtWidgets.QApplication(sys.argv)
+		
+		QtCore.QCoreApplication.setOrganizationName("TiagoRibeiro")
+		QtCore.QCoreApplication.setApplicationName("ContaContas")
+		self.engine = QtQml.QQmlApplicationEngine()
+		self.engine.rootContext().setContextProperty("movs_backend", self.movsBackend)
+	
+	def run(self):		
+		self.engine.load(QtCore.QUrl.fromLocalFile("gui/qml/main.qml"))
+		if not self.engine.rootObjects():
+			sys.exit(-1)
+		self.app.exec_()
+	
