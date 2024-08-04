@@ -72,6 +72,17 @@ class MovementsBackend(QtCore.QObject):
 		# Implement filter logic
 		self.updateMovements()
 
+	@QtCore.Slot(int)
+	def setfilterByDate(self, value):
+		print(value)
+
+	@QtCore.Slot(int, result=str)
+	def getMonthStrByIndex(self, value):
+		s = self.cc.months[value]
+		if not isinstance(s, str):
+			s = f"{s[0]}/{s[1]}"
+		return s
+
 	@QtCore.Slot()
 	def updateMovements(self):
 		# Implement logic to update movements based on filters

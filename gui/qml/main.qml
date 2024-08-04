@@ -37,99 +37,154 @@ ApplicationWindow {
         }
         Item {
             id: movementsTab
-            ColumnLayout {
+            Layout.fillHeight: true
+            Layout.fillWidth: true
+
+            RowLayout {
                 spacing: 10
-                anchors.fill: parent
+                Layout.fillHeight: true
+                Layout.fillWidth: true
 
-                Button {
-                    text: "Show Non-Internal Only"
-                    onClicked: movs_backend.setNonInternalFilter()
-                }
-                Button {
-                    text: "Show Internal Only"
-                    onClicked: movs_backend.setInternalOnlyFilter()
-                }
-                Button {
-                    text: "Show All"
-                    onClicked: movs_backend.setAllFilter()
+                ColumnLayout {                    
+                    Layout.preferredWidth: 200
+
+                    Button {
+                        text: "Show Non-Internal Only"
+                        onClicked: movs_backend.setNonInternalFilter()
+                    }
+                    Button {
+                        text: "Show Internal Only"
+                        onClicked: movs_backend.setInternalOnlyFilter()
+                    }
+                    Button {
+                        text: "Show All"
+                        onClicked: movs_backend.setAllFilter()
+                    }
+
+                    Text { text: "Filter by account:" }
+                    ListView {
+                        id: accountsList
+                        property int hovered_index: -1
+                        clip: true
+                        Layout.fillWidth: true
+                        height: 150
+                        model: movs_backend.accountsModel
+
+                        delegate: Item {
+                            id: delegateItem
+                            width: accountsList.width
+                            height: Math.max(textItem.implicitHeight, mouseArea.implicitHeight) + 10
+                            Rectangle {
+                                anchors.fill: parent
+                                color: accountsList.hovered_index === index ? "cadetblue" : (accountsList.currentIndex === index ? "darkcyan" : "lightgray")
+                            }
+                            Text {
+                                id: textItem
+                                text: model.display
+                                color: "black"
+                            }
+                            MouseArea {
+                                id: mouseArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: accountsList.currentIndex = index
+                                onEntered: accountsList.hovered_index = index
+                                onExited: if (accountsList.hovered_index === index) { accountsList.hovered_index = -1}
+                            }
+                        }
+                        
+                        ScrollBar.vertical: ScrollBar {}
+                    }
+
+                    Text { text: "Filter by tag:" }
+                    ListView {
+                        id: tagsList
+                        property int hovered_index: -1
+                        clip: true
+                        Layout.fillWidth: true
+                        height: 300
+                        model: movs_backend.tagsModel
+
+                        delegate: Item {
+                            id: delegateItem
+                            width: tagsList.width
+                            height: Math.max(textItem.implicitHeight, mouseArea.implicitHeight) + 10
+                            Rectangle {
+                                anchors.fill: parent
+                                color: tagsList.hovered_index === index ? "cadetblue" : (tagsList.currentIndex === index ? "darkcyan" : "lightgray")
+                            }
+                            Text {
+                                id: textItem
+                                text: model.display
+                                color: "black"
+                            }
+                            MouseArea {
+                                id: mouseArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: tagsList.currentIndex = index
+                                onEntered: tagsList.hovered_index = index
+                                onExited: if (tagsList.hovered_index === index) { tagsList.hovered_index = -1}
+                            }
+                        }
+                        
+                        ScrollBar.vertical: ScrollBar {}
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        color: "transparent"
+                    }
                 }
 
-                Text { text: "Filter by account:" }
-                ListView {
-                    id: accountsList
-                    property int hovered_index: -1
-                    clip: true
+                ColumnLayout {
                     Layout.fillWidth: true
-                    height: 150
-                    model: movs_backend.accountsModel
 
-                    delegate: Item {
-                        id: delegateItem
-                        width: accountsList.width
-                        height: Math.max(textItem.implicitHeight, mouseArea.implicitHeight) + 10
-                        Rectangle {
-                            anchors.fill: parent
-                            color: accountsList.hovered_index === index ? "cadetblue" : (accountsList.currentIndex === index ? "darkcyan" : "lightgray")
+                    RowLayout {
+                        Label {
+                            text: "Filter by Date:"
                         }
-                        Text {
-                            id: textItem
-                            text: model.display
-                            color: "black"
+
+                        Label {
+                            id: fbds_minLabel
+                            text: "ALL"
                         }
-                        MouseArea {
-                            id: mouseArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onClicked: accountsList.currentIndex = index
-                            onEntered: accountsList.hovered_index = index
-                            onExited: if (accountsList.hovered_index === index) { accountsList.hovered_index = -1}
+
+                        Slider {
+                            id: filterByDateSlider
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: parent.width * 0.7
+                            from: 0
+                            to: 30
+                            stepSize: 1.0
+                            value: 0
+                            onValueChanged: {
+                                let intValue = Math.round(value);
+                                movs_backend.setfilterByDate(intValue)
+                                dateSegmentText.text = movs_backend.getMonthStrByIndex(intValue)
+                            }
+                        }
+
+                        Label {
+                            id: fbds_maxLabel
+                            text: "Latest"
                         }
                     }
-                    
-                    ScrollBar.vertical: ScrollBar {}
-                }
 
-                Text { text: "Filter by tag:" }
-                ListView {
-                    id: tagsList
-                    property int hovered_index: -1
-                    clip: true
-                    Layout.fillWidth: true
-                    height: 300
-                    model: movs_backend.tagsModel
-
-                    delegate: Item {
-                        id: delegateItem
-                        width: tagsList.width
-                        height: Math.max(textItem.implicitHeight, mouseArea.implicitHeight) + 10
-                        Rectangle {
-                            anchors.fill: parent
-                            color: tagsList.hovered_index === index ? "cadetblue" : (tagsList.currentIndex === index ? "darkcyan" : "lightgray")
-                        }
-                        Text {
-                            id: textItem
-                            text: model.display
-                            color: "black"
-                        }
-                        MouseArea {
-                            id: mouseArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onClicked: tagsList.currentIndex = index
-                            onEntered: tagsList.hovered_index = index
-                            onExited: if (tagsList.hovered_index === index) { tagsList.hovered_index = -1}
+                    RowLayout {
+                        Text { text: "Date Segment: " }
+                        Text { 
+                            id: dateSegmentText
+                            text: "<ALL>" 
                         }
                     }
-                    
-                    ScrollBar.vertical: ScrollBar {}
-                }
 
-                Text { text: "end" }
-
-                Rectangle {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    color: "transparent"
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        color: "transparent"
+                    }
                 }
             }
 

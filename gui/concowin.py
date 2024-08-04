@@ -97,6 +97,7 @@ import sys
 class ConCoWinQt:
 	def __init__(self, contacontas):
 		self.cc = contacontas
+		self.cc.finalize_before_gui()
 		self.debug = True
 		global ccw
 		ccw = self
