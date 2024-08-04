@@ -90,7 +90,7 @@ class Config:
         path = str(path)
         if data:
             mod_time = os.path.getmtime(path)
-            path_hash = hashlib.md5(path.encode()).hexdigest()
+            path_hash = hashlib.md5(str(path).encode()).hexdigest()
             cache_filename = self.cache_path(path_hash)
             if path_hash in self.caches and os.path.exists(cache_filename):
                 cache_time = self.caches[path_hash]
@@ -114,7 +114,7 @@ class Config:
     def get_source_cache(self, path):
         if self.rebuild_cache:
             return None
-        path_hash = hashlib.md5(path.encode()).hexdigest()
+        path_hash = hashlib.md5(str(path).encode()).hexdigest()
         cache_filename = self.cache_path(path_hash)
         if path_hash in self.caches and os.path.exists(cache_filename):
             cache_time = self.caches[path_hash]

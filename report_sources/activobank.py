@@ -9,27 +9,29 @@ from data.bank import Bank, Account, Segment, Movement
 from .util import isFloat, isInt, extract_datetime_Ymd, extract_datetime_mov, extract_decimals
 from decimal import *
 import re
+import dateutil
 
 DEBUG = False
 
-kRESUMO_DAS_CONTAS = "RESUMO DAS CONTAS"
-kEOF = "DE INFORMAÇÃO SOBRE OS SERVIÇOS MÍNIMOS BANCÁRIOS"
-kEOPFrom = "A TRANSPORTAR"
-kEOPTo = "TRANSPORTE"
-#kCONTA_SIMPLES = "CONTA SIMPLES N"
-#kCONTA_TITULOS = "CONTA TITULOS N"
-#kCONTA_POUPANCA = "ESCOLHA PRAZO J VENC"
-kSALDO_INICIAL = "SALDO INICIAL"
-kSALDO_FINAL = "SALDO FINAL"
-kEXTRACTO_DATAS = "EXTRATO DE"
-kCC_START = "OPERACAO DEBITO CREDITO"
-kCC_END	 = "SALDO EM DIVIDA A DATA DO EXTRATO ATUAL"
+kEC_RESUMO_DAS_CONTAS = "RESUMO DAS CONTAS"
+kEC_EOF = "DE INFORMAÇÃO SOBRE OS SERVIÇOS MÍNIMOS BANCÁRIOS"
+kEC_EOPFrom = "A TRANSPORTAR"
+kEC_EOPTo = "TRANSPORTE"
+kEC_SALDO_INICIAL = "SALDO INICIAL"
+kEC_SALDO_FINAL = "SALDO FINAL"
+kEC_EXTRACTO_DATAS = "EXTRATO DE"
+kEC_CC_START = "OPERACAO DEBITO CREDITO"
+kEC_CC_END	 = "SALDO EM DIVIDA A DATA DO EXTRATO ATUAL"
+
+kCC_MOV_START = "DETALHE DOS MOVIMENTOS"
+kCC_MOV_END = "CE05822/01"
+kCC_DATE = "Emissão do Extrato Atual:"
 
 def is_extracto_combinado(lines):
-	return 'EXTRATO COMBINADO' in lines[4:15]
+	return 'CE05669/01' in lines[0:3]
 
 def is_extracto_cc(lines):
-	return any(s.startswith('EXTRATO VISA') for s in lines[5:15])
+	return 'CE05822/01' in lines[0:3]
 
 class ActivoBank(Bank):
 
@@ -39,8 +41,8 @@ class ActivoBank(Bank):
 	@staticmethod
 	def is_source(lines):
 		# first parser was written on this date, so we know it works from here
-		if (	'ACTVPTPL' in  lines[5:15] or
-	  			'ActivoBank' in lines[0:3]):
+		if (	'CE05669/01' in  lines[0:3] or
+	  			'CE05822/01' in lines[0:3]):
 			if is_extracto_combinado(lines):
 				return True
 			elif is_extracto_cc(lines):
@@ -52,11 +54,12 @@ class ActivoBank(Bank):
 	def parse_source(self, all_lines):
 		print("Parsing ActivoBank report... ", len(all_lines), "lines.")
 		if is_extracto_combinado(all_lines):
-			self.activo_bank_parse_extracto_combinado(all_lines)
+			return self.activo_bank_parse_extracto_combinado(all_lines)
 		elif is_extracto_cc(all_lines):
-			self.activo_bank_parse_extracto_cc(all_lines)
+			return self.activo_bank_parse_extracto_cc(all_lines)
 		else:
 			print("Unknown document type from ActivoBank.")
+			return None
 
 	class DocType(Enum):
 		ExtractoCombinado = 1
@@ -77,11 +80,11 @@ class ActivoBank(Bank):
 				raise ValueError("Mismatching '" + delim1 + "/" + delim2 + "' block in " + block_description + "!")
 
 		def cleanup_transport(self):
-			self.check_block_delimiters(kEOPFrom, kEOPTo, "segment")
+			self.check_block_delimiters(kEC_EOPFrom, kEC_EOPTo, "segment")
 
-			for i in range(len(self._index[kEOPFrom])):
-				i_from = self._index[kEOPFrom][i]
-				i_to = self._index[kEOPTo][i]
+			for i in range(len(self._index[kEC_EOPFrom])):
+				i_from = self._index[kEC_EOPFrom][i]
+				i_to = self._index[kEC_EOPTo][i]
 				remove_num_lines = i_to - i_from + 1
 				new_index = {}
 				for k,v in self._index.items():
@@ -94,14 +97,14 @@ class ActivoBank(Bank):
 				slice1 = self._lines[:i_from]
 				slice2 = self._lines[i_to+1:]
 				self._lines = slice1 + slice2
-			self._index[kEOPFrom] = []
-			self._index[kEOPTo] = []
+			self._index[kEC_EOPFrom] = []
+			self._index[kEC_EOPTo] = []
 
 		def extract_segments(self):
 
 			def extract_a_ordem(self):
-				self.start_value = extract_decimals(self._l(kSALDO_INICIAL), join=True)
-				self.end_value = extract_decimals(self._l(kSALDO_FINAL), join=True)
+				self.start_value = extract_decimals(self._l(kEC_SALDO_INICIAL), join=True)
+				self.end_value = extract_decimals(self._l(kEC_SALDO_FINAL), join=True)
 				if DEBUG:
 					print("A ORDEM")
 					print("Start Value", self.start_value)
@@ -109,7 +112,7 @@ class ActivoBank(Bank):
 				prev_sum = self.start_value
 				check_sum = prev_sum
 				movements = []
-				for i in range(self._index[kSALDO_INICIAL][0]+1, self._index[kSALDO_FINAL][0]-1):
+				for i in range(self._index[kEC_SALDO_INICIAL][0]+1, self._index[kEC_SALDO_FINAL][0]):
 					splits = self._lines[i].split(' ')
 					date = extract_datetime_mov(splits[0]).replace(year=self.start_date.year)
 					desc_start_i = 2
@@ -132,20 +135,18 @@ class ActivoBank(Bank):
 				self.segments["Ordem"].append((movements))
 
 			def extract_cc(self):
-				if len(self._index[kCC_START])>0:
-					self._index[kCC_END] = self._index[kCC_END][1:]
+				if len(self._index[kEC_CC_START])>0:
+					self._index[kEC_CC_END] = self._index[kEC_CC_END][1:]
 
 					if DEBUG: print("CC")
 					movement_lines = []
-					for i in range(len(self._index[kCC_START])):
-						start_idx = self._index[kCC_START][i]
-						end_idx = self._index[kCC_END][i]
-						
-						for j in range(start_idx+1, end_idx):
-							if len(list(re.finditer("(\d\d*\.\d{2}\s){2}",self._lines[j])))>0:
-								movement_lines.append(self._lines[j])
-							else:
-								movement_lines[-1] += " " + self._lines[j]
+					for i in range(len(self._index[kEC_CC_START])):
+						start_idx = self._index[kEC_CC_START][i]
+						end_idx = self._index[kEC_CC_END][i]
+						# ((\d?\d\.\d\d\s\d?\d.\d\d)([\w\s\-\>\<]|(\D\.\D))+(\d*\d.\d\d(?=\s)))
+						expr = r"((?:\d?\d\.\d\d\s\d?\d.\d\d)(?:.(?![01]?\d\.\d\d\s[01]?\d\.\d\d\s\D))+)+"
+						txt = ' '.join(self._lines[start_idx+1: end_idx])
+						movement_lines.extend([m for m in re.findall(expr, txt)])
 					movements = []
 					for ml in movement_lines:
 						splits = ml.strip().split(' ')
@@ -157,15 +158,16 @@ class ActivoBank(Bank):
 							value = splits[-1]
 							desc = splits[2:-1]
 						value = float(value)
-						desc = ' '.join(desc)
-						if not "pagamento cartao de credito" in desc:
+						desc = ' '.join(desc).lower().strip()
+						if (not "pagamento cartao de credito" in desc and
+		  						not desc.startswith('cred.')):
 							value = -value
 						movements.append(Movement(date, desc, value))
 						if DEBUG: print("\t", movements[-1])
 					self.segments["CC"].append((movements))
 
-			self.start_date = extract_datetime_Ymd(self._l(kEXTRACTO_DATAS), 2)
-			self.end_date = extract_datetime_Ymd(self._l(kEXTRACTO_DATAS), 4)
+			self.start_date = extract_datetime_Ymd(self._l(kEC_EXTRACTO_DATAS), 2)
+			self.end_date = extract_datetime_Ymd(self._l(kEC_EXTRACTO_DATAS), 4)
 			if DEBUG:
 				print("Start Date", self.start_date)
 				print("Start Date", self.end_date)
@@ -177,15 +179,8 @@ class ActivoBank(Bank):
 		if line.lower() == "CONTA SIMPLES".lower():
 			pass
 		
-	def _create_index_extracto_combinado(self, all_lines):
+	def _create_index_extracto(self, all_lines, keylines, keylinestarts, keylinecontains):
 		index = {}
-		keylines = [kRESUMO_DAS_CONTAS, kCC_START #, kCONTA_POUPANCA
-		]
-
-		keylinestarts = [kEOPFrom, kEOPTo,# kCONTA_SIMPLES, kCONTA_TITULOS,
-		kSALDO_INICIAL, kSALDO_FINAL, kEXTRACTO_DATAS, kCC_END]
-
-		keylinecontains = [kEOF]
 
 		for keygroup in [keylines, keylinestarts, keylinecontains]:
 			for k in keygroup:
@@ -205,6 +200,12 @@ class ActivoBank(Bank):
 					key_index = line
 				index[key_index].append(i)
 		return index
+	
+	def _create_index_extracto_combinado(self, all_lines):
+		keylines = [kEC_RESUMO_DAS_CONTAS, kEC_CC_START ]
+		keylinestarts = [kEC_EOPFrom, kEC_EOPTo,kEC_SALDO_INICIAL, kEC_SALDO_FINAL, kEC_EXTRACTO_DATAS, kEC_CC_END]
+		keylinecontains = [kEC_EOF]
+		return self._create_index_extracto(all_lines, keylines, keylinestarts, keylinecontains)
 		
 
 	def activo_bank_parse_extracto_combinado(self, all_lines):
@@ -220,14 +221,14 @@ class ActivoBank(Bank):
 		print("DocType: Extracto Combinado.")
 		index = self._create_index_extracto_combinado(all_lines)
 		month_lines = []
-		start_line = index[kRESUMO_DAS_CONTAS][0]
+		start_line = index[kEC_RESUMO_DAS_CONTAS][0]
 		month_indexes = []
-		for i in range(1,len(index[kRESUMO_DAS_CONTAS])):
-			end_line = index[kRESUMO_DAS_CONTAS][i]
+		for i in range(1,len(index[kEC_RESUMO_DAS_CONTAS])):
+			end_line = index[kEC_RESUMO_DAS_CONTAS][i]
 			month_lines, month_indexes = extract_month(month_lines, month_indexes)
 			start_line = end_line
 
-		end_line = index[kEOF][0]
+		end_line = index[kEC_EOF][0]
 		month_lines, month_indexes = extract_month(month_lines, month_indexes)
 		
 		months = []
@@ -238,3 +239,67 @@ class ActivoBank(Bank):
 			for account, movements in month.segments.items():
 				for mov in movements:
 					self.append_account_segment(account, mov)
+		return months
+
+	def _create_index_extracto_cc(self, all_lines):
+		keylines = [kCC_MOV_START, kCC_MOV_END ]
+		keylinestarts = [kCC_DATE]
+		keylinecontains = []
+		return self._create_index_extracto(all_lines, keylines, keylinestarts, keylinecontains)
+
+	def activo_bank_parse_extracto_cc(self, all_lines):
+
+		def extract_month(month_lines, i):
+			# movs starts 5 lines after key
+			mov_start_i = index[kCC_MOV_START][i] + 5
+			mov_end_i = index[kCC_MOV_END][i]
+			month_lines.append(all_lines[mov_start_i:mov_end_i])
+			return month_lines
+		
+		print("DocType: Extracto Cartão de Crédito.")
+		index = self._create_index_extracto_cc(all_lines)
+		index[kCC_MOV_END] = index[kCC_MOV_END][1:]
+		next_mov_end_i = 0
+		clean_mov_start = []
+		mov_started = False
+		for s in index[kCC_MOV_START]:
+			if next_mov_end_i >= len(index[kCC_MOV_END]):
+				index[kCC_MOV_END].append(len(all_lines))
+				break
+			if s > index[kCC_MOV_END][next_mov_end_i]:
+				next_mov_end_i += 1
+				mov_started = False
+			if mov_started:
+				if s < index[kCC_MOV_END][next_mov_end_i]:
+					continue
+			mov_started = True
+			clean_mov_start.append(s)
+		index[kCC_MOV_START] = clean_mov_start
+		num_months = len(index[kCC_MOV_START])
+
+		assert(num_months == len(index[kCC_MOV_END]))
+		assert(num_months == len(index[kCC_DATE]))
+
+		month_lines = []
+		
+		for i in range(0,num_months):
+			month_lines = extract_month(month_lines, i)
+
+		for lines in month_lines:
+			movements = []
+			for l in lines:
+				try:
+					split = l.split()
+					date = dateutil.parser.parse(split[0])
+					if split[-2].isdigit() and len(split[-2]) == 1: # assume movements are not > 9999
+						value = split[-2] + split[-1]
+						desc = split[2:-2]
+					else:
+						value = -float(split[-1])
+						desc = " ".join(split[2:-1]).lower().strip()
+						if (	'pagamento cartao de credito' in desc or
+		  						desc.startswith('cred.')):
+							value *= -1
+						movements.append(Movement(date, desc, value))
+				except: pass
+			self.append_account_segment("CC", movements)

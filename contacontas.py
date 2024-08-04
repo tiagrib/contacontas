@@ -5,7 +5,7 @@
 
 from pathlib import Path
 import pickle
-from data.bank import Bank
+from data.bank import Account, Bank
 from data.overviews import Overviews
 from etl import pdf_etl as pdf
 from report_sources.activobank import ActivoBank
@@ -28,6 +28,7 @@ class ContaContas:
 		if Path(STORAGE_FILE).exists() and not self.ccargs.rebuild:
 			self.reload()
 			self.ccargs = parser.parse_args()
+			self.config = Config(self.ccargs)
 		else:
 			self.ccargs = parser.parse_args()
 			self.sources = []
@@ -42,10 +43,10 @@ class ContaContas:
 			}
 			self.autoclasses = {}
 			self.classes = {}
+			self.config = Config(self.ccargs)
+			self.over = Overviews(self)
+			self.load_sources_from_config()
 		self.months = []
-		self.config = Config(self.ccargs)
-		self.over = Overviews(self)
-		self.load_sources_from_config()
 
 	def get_bank_accounts(self):
 		res = []
@@ -55,21 +56,27 @@ class ContaContas:
 		return res
 
 	def load_sources_from_config(self):
-		for account_name, info in self.config.setup['accounts'].items():
-			if info is None or info == {} or 'bank_type' not in info:
-				print(f"Failed to initialize account {account_name} from config! Invalid info '" + info + "'.")
+		for bank_name, binfo in self.config.setup['banks'].items():
+			bank_name = bank_name.lower()
+			if bank_name in self.banks:
+				bank = self.banks[bank_name]
 			else:
-				if info['bank_type'].lower() == 'activobank':
-					bank = ActivoBank()
-				elif info['bank_type'].lower() == 'paypal':
-					bank = PayPal()
+				bank = None
+				if bank_name in ['activobank', 'paypal']:
+					bank = {'activobank': ActivoBank(), 'paypal': PayPal()}[bank_name]
 				else:
-					bank = None
-					print(f"Failed to initialize account {account_name} from config! Invalid bank '" + info['bank_type'] + "'.")
-				if bank:
-					print(f"Initialize account {account_name} from bank {info['bank_type']}.")
-					bank.add_account(account_name)
-					self.digest_source(bank)
+					print(f"Failed to initialize account '{account_name}' from config! Invalid bank '{bank_name}'.")
+			if bank and "accounts" in binfo:
+				for account_name, info in binfo["accounts"].items():
+					if info is None or info == {}:
+						print(f"Failed to initialize account '{account_name}' from config! Invalid info '{info}'.")
+					else:
+						print(f"Initialize account '{account_name}' from bank '{bank_name}'.")
+						account = Account(bank=bank, account_name=account_name, 
+										  initial_value=info['initial_value'] if 'initial_value' in info else False, 
+										  all_internal=info['all_internal'] if 'all_internal' in info else False)
+						bank.add_account(account)
+				self.digest_source(bank)
 		
 		for path in self.config.setup['unsorted_source_paths']:
 			pathfiles = Path(path).glob('**/*')
@@ -193,8 +200,8 @@ class ContaContas:
 	def update(self):
 		self.over.update()
 		
-	def run_clustering_kmeans(self, clusters=0):
-		cn, ci = self.data.classify_kmeans(clusters)
+	def run_clustering_kmeans(self, clusters=0, clear=False):
+		cn, ci = self.data.classify_kmeans(clusters, init_clusters=self.autoclasses if not clear else {})
 		self.clustering['kmeans']['clusters'] = clusters
 		self.clustering['kmeans']['names'] = cn
 		self.clustering['kmeans']['idxs'] = ci
@@ -207,13 +214,13 @@ class ContaContas:
 
 	def finalize_loading(self):
 		self.data.finalize_loading()
-		self.make_records_from_tagged('poup_in', "ActivoBank.Poupanças", invert_value=True)
-		self.make_records_from_tagged('poup_out', "ActivoBank.Poupanças", invert_value=True)
+		self.make_records_from_tagged('to_poup', "ActivoBank.Poupanças", invert_value=True, new_tag='poup_in')
+		self.make_records_from_tagged('from_poup', "ActivoBank.Poupanças", invert_value=True, new_tag='poup_out')
 		self.data.postprocess()
 		self.update()
 
 
-	def make_records_from_tagged(self, tag, bank_account, invert_value=False):
+	def make_records_from_tagged(self, tag, bank_account, invert_value=False, new_tag=""):
 		split_bank_account = bank_account.split('.')
 		if len(split_bank_account) != 2:
 			raise Exception(f"Specified bank-account is not valid: '{bank_account}'.")
@@ -231,7 +238,7 @@ class ContaContas:
 			records.append([r['bank'], account, r['date'], value_mult * r['value'], r['desc']])
 		self.data.allocate(1, 1, len(records))
 		for r in records:
-			self.data._add_record_preallocated(*r, tag="", internal=True)
+			self.data._add_record_preallocated(*r, tag=new_tag, internal=True)
 		self.data.finalize_loading_bank_account()
 
 	def launchGUI(self, gui):

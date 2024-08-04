@@ -1,13 +1,20 @@
 {
-    "accounts": {
-        "Poupan\u00e7as": {
-            "bank_type": "ActivoBank",
-            "sources": []
+    "banks": {
+        "ActivoBank": {
+            "accounts": {
+                "Poupan\u00e7as": {
+                    "all_internal": true,
+                    "initial_value": 26700.62
+                },
+                "Ordem": {
+                    "initial_value": 1522.37
+                }
+            }
         }
     },
     "unsorted_source_paths": [
-        "../IRS2021/contacontas",
-        "../IRS2022/contacontas",
-        "../IRS2023/contacontas"
+        "../Contas/IRS2021/contacontas",
+        "../Contas/IRS2022/contacontas",
+        "../Contas/IRS2023/contacontas"
     ]
 }

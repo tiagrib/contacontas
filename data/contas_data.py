@@ -50,6 +50,7 @@ class ContasData:
 		#self.m.set_index('sha')
 		self.all_tags = []
 		self.mcoli = {}
+		self.months = []
 
 	def make_loading_block(self):
 		return np.array([], dtype=np.dtype([
@@ -138,6 +139,9 @@ class ContasData:
 		self.m.sort_values(by='account', inplace = True, kind='stable')
 		self.m.sort_values(by='date', inplace = True)
 
+		self.months = list(set([(d.year, d.month) for d in self.m.date.unique()]))
+		self.months.sort()
+
 		# collect all existing tags
 		all_unique_tags = self.m[manip.TAGS_FIELD].unique()
 		for tagstring in all_unique_tags:
@@ -166,8 +170,10 @@ class ContasData:
 
 				cls.t_and(
 					cls.t_eq("bank", "PayPal"),
-					cls.t_contains_words("desc", "general withdrawal - bank account")): 
-									"paypal_cash_out",
+					cls.t_contains_words("desc", 
+						  [ "general withdrawal - bank account",
+							"general credit card withdrawal" 
+							])): "paypal_cash_out",
 
 				cls.t_and(
 					cls.t_and(
@@ -204,14 +210,14 @@ class ContasData:
 						cls.t_eq("bank", "ActivoBank"),
 						cls.t_eq("account", "Ordem")),
 					cls.t_contains_words("desc", "liq parcial dep prazo")
-				): "poup_out",
+				): "from_poup",
 
 				cls.t_and(
 					cls.t_and(
 						cls.t_eq("bank", "ActivoBank"),
 						cls.t_eq("account", "Ordem")),
 					cls.t_contains_words("desc", "reforco dep prazo")
-				): "poup_in",
+				): "to_poup",
 		}))
 
 		self.m = stack.run(self.m)
@@ -227,5 +233,5 @@ class ContasData:
 		manip.aggregate_by_month_from_tag(self, "ActivoBank", "CC", "cc_cash_in", 'sum')
 		manip.aggregate_by_month_from_tag(self, "ActivoBank", "Ordem", "cc_cash_out", 'sum')
 
-	def classify_kmeans(self, n_clusters=0):
-		return manip.cluster(self.m, "desc", n_clusters)
+	def classify_kmeans(self, n_clusters=0, init_clusters={}):
+		return manip.cluster(self.m, "desc", n_clusters, init_clusters)

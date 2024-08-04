@@ -139,13 +139,12 @@ def contains_tag(rec, tag):
             rec.tags == tag) or \
         any(tag == t for t in rec.tags.split(TAG_SPLITTER))
 
-def kmeans(data, **kwargs):
+def kmeans(data, init_clusters, **kwargs):
     tfidf = TfidfVectorizer()
     vec = tfidf.fit_transform(data.to_list())
-    kmeans = KMeans(**kwargs)
-    kmeans.fit(vec)
-    sse = kmeans.inertia_
-    clusters = kmeans.predict(vec)
+    init_cluster_vec = tfidf.transform(init_clusters.keys())
+    kmeans = KMeans(init=init_cluster_vec, **kwargs)
+    clusters = kmeans.fit_predict(vec)
     unique_clusters, cluster_description_indices = np.unique(clusters, return_index=True)
     cluster_indices = [np.where(clusters==i)[0] for i in unique_clusters]
     cluster_descriptions = []
@@ -169,7 +168,7 @@ def kmeans(data, **kwargs):
             final_ci.append(cluster_indices[i])
     return final_cn, final_ci
 
-def cluster(df, field, n_clusters=0):
+def cluster(df, field, n_clusters=0, init_clusters={}):
     mask = (df['tags']=='') & (df[field]!='')
     reindex = []
     for i in range(len(mask)):
@@ -179,8 +178,8 @@ def cluster(df, field, n_clusters=0):
     data = df[(df['tags']=='') & (df[field]!='')][field]
     if n_clusters == 0:
         n_clusters = len(data)
-    n_clusters = min(100, min(n_clusters, len(data)))
-    cn, ci = kmeans(data, n_clusters=n_clusters)
+    n_clusters = min(100, n_clusters, len(data))
+    cn, ci = kmeans(data, n_clusters=n_clusters, init_clusters=init_clusters)
     remap_ci = []
     for kci in ci:
         remap_ci.append(reindex[kci])

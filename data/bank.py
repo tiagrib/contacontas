@@ -13,11 +13,12 @@ class Segment():
 		self.movements = movements
 
 class Account():
-	def __init__(self, account_name, bank):
+	def __init__(self, account_name, bank, initial_value=0, all_internal=False):
 		self.bank = bank
 		self.name = account_name
 		self.segments = []
-		self.initial_value = 0
+		self.initial_value = initial_value
+		self.all_internal = all_internal
 
 	def append_segment(self, movements):
 		self.segments.append(Segment(self, movements))
