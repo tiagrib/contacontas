@@ -1,9 +1,6 @@
 import QtQuick 2.15
+import QtQuick.Controls 2.15
+import QtQuick.Controls.Material 2.15
+import QtQuick.Layouts 1.15
+import Matplotlib 1.0
 
-Item {
-    // Add your Classifier tab content here
-    Text {
-        text: "Summary Content"
-        anchors.centerIn: parent
-    }
-}

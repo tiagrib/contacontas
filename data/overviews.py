@@ -1,3 +1,6 @@
+from gui.qml.plot_data import get_plot_data_from_summary
+
+
 class Overviews:
 
     class AccountMonthly:
@@ -24,6 +27,10 @@ class Overviews:
         self.cc = cc
         self.accounts_by_month = {}
         self.accounts_monthly = {}
+
+
+    def get_summary_plot_data(self, idx=0):
+        return get_plot_data_from_summary(self)
 
     def update(self):
         prev_month = {}
@@ -69,3 +76,5 @@ class Overviews:
                 for account in bank.accounts.values():
                     amdata = md[md.account==account.name]
                     add_monthly(ym, account, amdata)
+
+        self.cc.plotUpdated.emit(0)

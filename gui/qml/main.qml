@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import Matplotlib 1.0
 
 ApplicationWindow {
     id: mainWindow
@@ -31,7 +32,7 @@ ApplicationWindow {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         currentIndex: tabBar.currentIndex
-
+        
         Loader {
             source: "classifier_tab.qml"
         }
@@ -180,22 +181,77 @@ ApplicationWindow {
                         }
                     }
 
-                    Rectangle {
+                    TableView {
+                        id: tableView
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        color: "transparent"
+                        clip: true
+                        model: movs_backend.movementsModel
+
+                        delegate: Rectangle {
+                            implicitWidth: 100
+                            implicitHeight: 30
+                            color: selected ? "blue" : "lightgray"
+
+                            required property bool selected
+
+                            Text { text: display }
+                        }
+                    }
+
+                    SelectionRectangle { 
+                        selectionMode: SelectionRectangle.PressAndHold 
                     }
                 }
             }
 
             Component.onCompleted: {
-                console.log("ListView model count: " + accountsList.count)
+                console.log("accountsList ListView model count: " + accountsList.count)
                 console.log("movsBackend: " + movs_backend)
-                console.log("ListView width: " + accountsList.width)
+                console.log("accountsList ListView width: " + accountsList.width)
             }
         }
-        Loader {
-            source: "summary_tab.qml"
+        Item {
+            // Add your Classifier tab content here
+            Text {
+                text: "Summary Content"
+                anchors.centerIn: parent
+            }
+
+            ColumnLayout {
+                id: col1
+                spacing: 10
+                anchors.fill: parent
+
+                MatplotlibItem {
+                    id: matplotlibItem1
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    display_width: 500
+                    display_height: 150
+                }
+            }
+
+            Connections {
+                target: ccqt
+                function onSummaryPlotUpdated(index) {
+                    console.log("Update summary plot", index)
+                    if (index == 0) {
+                        matplotlibItem1.update_figure(ccwin, 0, col1.width, col1.height*0.25)
+                    } else if (index == 1) {
+                        //matplotlibItem2.update_figure(nnutty, 1, col1.width, col1.height*0.25)
+                    } else if (index == 2) {
+                        //matplotlibItem3.update_figure(nnutty, 2, col1.width, col1.height*0.40)
+                    }
+                }
+            }
+
+            Component.onCompleted: {
+                console.log(ccqt)
+                Qt.callLater(function() {
+                    matplotlibItem1.update_figure(ccqt, 0, col1.width, col1.height*0.25)
+                })
+            }
         }
     }
 }
