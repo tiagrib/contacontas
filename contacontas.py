@@ -88,12 +88,12 @@ class ContaContas:
                 self.digest_source(bank)
 
     def reload(self, parser):
-        self.ccargs = parser.parse_args()
-        self.config = Config(self.ccargs)
         with open(STORAGE_FILE, "rb") as file:
             storage = pickle.load(file)
             self.__dict__.update(storage.__dict__)
         print(f"Reload storage from '{STORAGE_FILE}'")
+        self.ccargs = parser.parse_args()
+        self.config = Config(self.ccargs)
 
     def save(self):
         with open(STORAGE_FILE, "wb") as file:
