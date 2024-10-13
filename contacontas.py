@@ -10,10 +10,9 @@ from data.overviews import Overviews
 from etl import pdf_etl as pdf
 from report_sources.activobank import ActivoBank
 from report_sources.paypal import PayPal
-from data.contas_data import ContasData
+from data.numpandas_database import NumpandasDatabase
 from data.config import Config
 import csv
-from time import perf_counter
 import argparse
 from datetime import datetime
 import pandas as pd
@@ -27,21 +26,22 @@ class ContaContas:
         parser.add_argument("-r", "--rebuild", help="Rebuild the cache on load.", action="store_true")
         self.ccargs = parser.parse_args()
         if Path(STORAGE_FILE).exists() and not self.ccargs.rebuild:
-            self.reload()
-            self.ccargs = parser.parse_args()
-            self.config = Config(self.ccargs)
+            self.reload(parser)
         else:
-            self.ccargs = parser.parse_args()
-            self.sources = []
-            self.banks = {}
-            self.data = ContasData()
-            self.clustering = {"kmeans": {"clusters": 0, "names": [], "idxs": []}}
-            self.autoclasses = {}
-            self.classes = {}
-            self.config = Config(self.ccargs)
-            self.over = Overviews(self)
-            self.load_sources_from_config()
+            self.init(parser)
         self.months = []
+
+    def init(self, parser):
+        self.ccargs = parser.parse_args()
+        self.sources = []
+        self.banks = {}
+        self.data = NumpandasDatabase()
+        self.clustering = {"kmeans": {"clusters": 0, "names": [], "idxs": []}}
+        self.autoclasses = {}
+        self.classes = {}
+        self.config = Config(self.ccargs)
+        self.over = Overviews(self)
+        self.load_sources_from_config()
 
     def get_bank_accounts(self):
         res = []
@@ -51,6 +51,22 @@ class ContaContas:
         return res
 
     def load_sources_from_config(self):
+        self.init_manual_sources()
+
+        self.init_unsored_sources()
+
+        self.finalize_loading()
+
+    def init_unsored_sources(self):
+        for path in self.config.setup["unsorted_source_paths"]:
+            pathfiles = Path(path).glob("**/*")
+            for file in pathfiles:
+                if file.suffix.lower() == ".csv":
+                    self.loadCSV(file)
+                elif file.suffix.lower() == ".pdf":
+                    self.loadPDF(file)
+
+    def init_manual_sources(self):
         for bank_name, binfo in self.config.setup["banks"].items():
             bank_name = bank_name.lower()
             if bank_name in self.banks:
@@ -60,7 +76,7 @@ class ContaContas:
                 if bank_name in ["activobank", "paypal"]:
                     bank = {"activobank": ActivoBank(), "paypal": PayPal()}[bank_name]
                 else:
-                    print(f"Failed to initialize account '{account_name}' from config! Invalid bank '{bank_name}'.")
+                    print(f"Invalid bank name '{bank_name}' in config!.")
             if bank and "accounts" in binfo:
                 for account_name, info in binfo["accounts"].items():
                     if info is None or info == {}:
@@ -71,18 +87,9 @@ class ContaContas:
                         bank.add_account(account)
                 self.digest_source(bank)
 
-        for path in self.config.setup["unsorted_source_paths"]:
-            pathfiles = Path(path).glob("**/*")
-            for file in pathfiles:
-                if file.suffix.lower() == ".csv":
-                    self.loadCSV(file)
-                elif file.suffix.lower() == ".pdf":
-                    self.loadPDF(file)
-
-        self.finalize_loading()
-        self.save()
-
-    def reload(self):
+    def reload(self, parser):
+        self.ccargs = parser.parse_args()
+        self.config = Config(self.ccargs)
         with open(STORAGE_FILE, "rb") as file:
             storage = pickle.load(file)
             self.__dict__.update(storage.__dict__)
@@ -125,7 +132,7 @@ class ContaContas:
                 self.digest_source(cache)
 
     def add_bank(self, bank):
-        if not bank.name in self.banks:
+        if bank.name not in self.banks:
             self.banks[bank.name] = bank
         else:
             for a in bank.accounts.values():
@@ -152,42 +159,6 @@ class ContaContas:
             self.data.load_bank(bank)
             return bank
 
-    # deprecated
-    def _count_prealloc(self):
-        mov_count = 0
-        acc_count = 0
-        for bank in self.banks.values():
-            for account in bank.accounts.values():
-                acc_count += 1
-                for segment in account.segments:
-                    mov_count += len(segment.movements)
-        return len(self.banks), acc_count, mov_count
-
-    # deprecated
-    def digest(self):
-        t1_start = perf_counter()
-        if not self.config.cocodb_cache or self.config.any_uncached_data_loaded or self.config.rebuild_cache:
-            print("Rebuild DB...")
-            self.data.allocate(*self._count_prealloc())
-            print("Load DB...")
-            for bank in self.banks.values():
-                for account in bank.accounts.values():
-                    for segment in account.segments:
-                        for mov in segment.movements:
-                            self.data.pre_record(bank.name, account.name, mov.date, mov.value, mov.desc)
-            print("Finalize DB...")
-            self.data.finalize()
-            self.config.save_cocodb(self.data)
-        else:
-            print("Load DB from cache...")
-            self.data = self.config.load_cocodb()
-            self.data.finalize_loading()
-
-        t1_stop = perf_counter()
-        print("DB Digestion took:", t1_stop - t1_start)
-        print("Run clustering methods.")
-        self.run_clustering_kmeans()
-
     def update(self):
         self.over.update()
 
@@ -205,31 +176,11 @@ class ContaContas:
 
     def finalize_loading(self):
         self.data.finalize_loading()
-        self.make_records_from_tagged("to_poup", "ActivoBank.Poupanças", invert_value=True, new_tag="poup_in")
-        self.make_records_from_tagged("from_poup", "ActivoBank.Poupanças", invert_value=True, new_tag="poup_out")
+        self.data.make_records_from_tagged("to_poup", "ActivoBank.Poupanças", new_tag="poup_in", invert_value=True)
+        self.data.make_records_from_tagged("from_poup", "ActivoBank.Poupanças", new_tag="poup_out", invert_value=True)
         self.data.postprocess()
+        self.save()
         self.update()
-
-    def make_records_from_tagged(self, tag, bank_account, invert_value=False, new_tag=""):
-        split_bank_account = bank_account.split(".")
-        if len(split_bank_account) != 2:
-            raise Exception(f"Specified bank-account is not valid: '{bank_account}'.")
-        bank = split_bank_account[0]
-        if not bank in self.banks:
-            raise Exception(f"Specified bank does not exist: '{bank}'.")
-        account = split_bank_account[1]
-        tagged_recs = self.data.get_tagged_records(tag)
-        records = []
-        value_mult = 1.0
-        if invert_value:
-            value_mult *= -1
-        for i in range(len(tagged_recs)):
-            r = tagged_recs.iloc[i]
-            records.append([r["bank"], account, r["date"], value_mult * r["value"], r["desc"]])
-        self.data.allocate(1, 1, len(records))
-        for r in records:
-            self.data._add_record_preallocated(*r, tag=new_tag, internal=True)
-        self.data.finalize_loading_bank_account()
 
     def launchGUI(self, gui):
         self.finalize_before_gui()

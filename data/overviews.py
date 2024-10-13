@@ -2,9 +2,8 @@ from gui.qml.plot_data import get_plot_data_from_summary
 
 
 class Overviews:
-
     class AccountMonthly:
-        def __init__(self, ym, info, data, prev_month = None, initial_value = None):
+        def __init__(self, ym, info, data, prev_month=None, initial_value=None):
             self.ym = ym
             self.prev_month = prev_month
             self.next_month = None
@@ -16,8 +15,8 @@ class Overviews:
             self.info = info
             self.data = data
             self.sum = self.initial_value + data.value.sum()
-            self.gain = data[data.value>=0].value.sum()
-            self.loss = data[data.value<0].value.sum()
+            self.gain = data[data.value >= 0].value.sum()
+            self.loss = data[data.value < 0].value.sum()
             acc_name = "ALL"
             if info:
                 acc_name = f"{info.bank.name}.{info.name}"
@@ -28,16 +27,15 @@ class Overviews:
         self.accounts_by_month = {}
         self.accounts_monthly = {}
 
-
     def get_summary_plot_data(self, idx=0):
         return get_plot_data_from_summary(self)
 
     def update(self):
         prev_month = {}
 
-        def add_monthly(ym, account, data, initial_value = None):
-            #if not account or not account.all_internal:
-                #data = data[data.internal==False]
+        def add_monthly(ym, account, data, initial_value=None):
+            # if not account or not account.all_internal:
+            # data = data[data.internal==False]
             prev_acc_month = prev_month[account] if account in prev_month else None
             if prev_acc_month is not None:
                 initial_value = prev_acc_month.sum
@@ -65,7 +63,7 @@ class Overviews:
 
         for ym in self.cc.data.months:
             md = self.cc.data.get_monthly(ym[0], ym[1])
-            #print("\n", ym, 'ALL', "POS:", md[md.value>=0].value.sum(), "NEG:", md[md.value<0].value.sum(), )
+            # print("\n", ym, 'ALL', "POS:", md[md.value>=0].value.sum(), "NEG:", md[md.value<0].value.sum(), )
             print()
             if first_month:
                 prev_all_balance = add_monthly(ym, None, md, initial_value=all_initial_value)
@@ -74,7 +72,7 @@ class Overviews:
 
             for bank in self.cc.banks.values():
                 for account in bank.accounts.values():
-                    amdata = md[md.account==account.name]
+                    amdata = md[md.account == account.name]
                     add_monthly(ym, account, amdata)
 
-        self.cc.plotUpdated.emit(0)
+        # self.cc.plotUpdated.emit(0)
